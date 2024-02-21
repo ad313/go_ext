@@ -5,7 +5,7 @@ import (
 	"os"
 )
 
-func deleteTmpFilesByPath(path string) error {
+func DeleteTmpFilesByPath(path string) error {
 	err := os.RemoveAll(path)
 	if err != nil {
 		fmt.Println("删除文件夹失败：", err)
