@@ -1,4 +1,4 @@
-package GoExt
+package goext
 
 import (
 	"fmt"
