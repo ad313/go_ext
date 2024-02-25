@@ -1,9 +1,11 @@
+// Package ext 反射扩展
 package ext
 
 import (
 	"reflect"
 )
 
+// IsType 判断两种类型是否 相等、继承
 func IsType[TSource any, Target any]() (*TSource, *Target, bool) {
 	var source = new(TSource)
 	v, ok := IsTypeByValue[Target](*source)
@@ -14,17 +16,7 @@ func IsType[TSource any, Target any]() (*TSource, *Target, bool) {
 	return nil, nil, false
 }
 
-//func IsFromStruct[T interface{}](value interface{}) bool {
-//	var target = new(T)
-//	var ss = reflect.TypeOf(&value).Elem()
-//	fmt.Println(ss)
-//	if reflect.TypeOf(&value).Elem() == reflect.TypeOf(*target) {
-//		return true
-//	}
-//
-//	return false
-//}
-
+// IsTypeByValue IsType 判断给定的值和类型是否 相等、继承
 func IsTypeByValue[T any](value any) (*T, bool) {
 
 	var inputPointer = false
@@ -45,7 +37,6 @@ func IsTypeByValue[T any](value any) (*T, bool) {
 				return &instance, true
 			}
 		} else {
-			//value = &value
 			if instance, ok := value.(T); ok {
 				return &instance, true
 			}
@@ -68,9 +59,7 @@ func IsTypeByValue[T any](value any) (*T, bool) {
 	}
 
 	//通过反射比较
-
 	var formatValue interface{}
-
 	if IsPointer(*new(T)) {
 		if inputPointer {
 			formatValue = value
@@ -85,17 +74,11 @@ func IsTypeByValue[T any](value any) (*T, bool) {
 		}
 	}
 
-	//fmt.Println(reflect.New(reflect.TypeOf(formatValue)).Interface())
-
 	if instance, ok := reflect.New(reflect.TypeOf(formatValue)).Interface().(T); ok {
 		return &instance, true
 	}
 
 	return nil, false
-}
-
-type Table struct {
-	Id int
 }
 
 // IsPointer 判断是否是指针
@@ -107,6 +90,10 @@ func IsPointer(param interface{}) bool {
 func IsPointerReturnValue(param interface{}) (interface{}, bool) {
 	value := reflect.ValueOf(param)
 	if value.Kind() == reflect.Ptr {
+		if value.Pointer() == 0 {
+			return nil, false
+		}
+
 		return value.Elem().Interface(), true
 	}
 	return nil, false
