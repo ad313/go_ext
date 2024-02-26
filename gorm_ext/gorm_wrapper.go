@@ -23,7 +23,7 @@ func BuildOrmWrapper[T any](ctx context.Context, db ...*gorm.DB) *OrmWrapper[T] 
 
 	//创建模型
 	var buildResult = BuildGormTable[T]()
-	wrapper.Model = buildResult.T
+	wrapper.Model = buildResult.Table.T
 	wrapper.Error = buildResult.Error
 	wrapper.builder = &OrmWrapperBuilder[T]{
 		wrapper:        wrapper,

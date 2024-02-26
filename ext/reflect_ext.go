@@ -3,6 +3,7 @@ package ext
 
 import (
 	"reflect"
+	"strings"
 )
 
 // IsType 判断 TSource 是否等于或者实现 Target
@@ -96,5 +97,10 @@ func GetPath[T interface{}]() string {
 		value = (*T)(nil)
 	}
 
-	return reflect.TypeOf(value).Elem().String()
+	var path = reflect.TypeOf(value).Elem().String()
+	if strings.HasPrefix(path, "*") {
+		return strings.TrimPrefix(path, "*")
+	} else {
+		return path
+	}
 }

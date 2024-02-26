@@ -203,12 +203,12 @@ func Test_GetPath(t *testing.T) {
 	}
 
 	value = GetPath[*table]()
-	if value != "*ext.table" {
+	if value != "ext.table" {
 		t.Errorf("GetPath faild")
 	}
 
 	value = GetPath[*table2]()
-	if value != "*ext.table2" {
+	if value != "ext.table2" {
 		t.Errorf("GetPath faild")
 	}
 }
