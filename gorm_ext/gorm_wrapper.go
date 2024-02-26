@@ -3,6 +3,7 @@ package gorm_ext
 import (
 	"context"
 	"errors"
+	"github.com/ad313/go_ext/ext"
 	"gorm.io/gorm"
 	"gorm.io/gorm/schema"
 	"reflect"
@@ -21,7 +22,7 @@ func BuildOrmWrapper[T any](ctx context.Context, db ...*gorm.DB) *OrmWrapper[T] 
 	var wrapper = &OrmWrapper[T]{}
 
 	//创建模型
-	var buildResult = BuildOrmModel[T]()
+	var buildResult = BuildGormTable[T]()
 	wrapper.Model = buildResult.T
 	wrapper.Error = buildResult.Error
 	wrapper.builder = &OrmWrapperBuilder[T]{
@@ -35,7 +36,7 @@ func BuildOrmWrapper[T any](ctx context.Context, db ...*gorm.DB) *OrmWrapper[T] 
 	wrapper.SetDbContext(ctx, db...)
 
 	if wrapper.Error == nil {
-		model, ok := IsTypeByValue[schema.Tabler](*(wrapper.Model))
+		model, ok := ext.IsTypeByValue[schema.Tabler](*(wrapper.Model))
 		if ok {
 			wrapper.builder.TableName = (*model).TableName()
 		} else {
