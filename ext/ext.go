@@ -129,6 +129,15 @@ func GetValueByFieldName(o interface{}, name string) any {
 	return nil
 }
 
+// ChooseTrueValue 模拟三元表达式，获取值
+func ChooseTrueValue[T interface{}](condition bool, trueValue, falseValue T) T {
+	if condition {
+		return trueValue
+	}
+
+	return falseValue
+}
+
 // Distinct 去重
 func Distinct[T comparable](slice []T) []T {
 	if slice == nil {
