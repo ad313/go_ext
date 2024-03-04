@@ -8,16 +8,14 @@ import (
 
 // WhereCondition 定义查询条件
 type WhereCondition interface {
-	GetSql() string           //获取当前条件的 sql
-	GetParams() []interface{} //获取当前条件的 参数
-	GetError() error          //获取生成sql时的错误
+	Build(dbType string) (string, []interface{}, error) //生成 sql
 }
 
 // ConditionBuilder 条件构建器
 type ConditionBuilder struct {
 	Or      bool                //and、or
 	Items   []*ConditionBuilder //条件集合
-	Current *WhereCondition     //当前条件
+	Current WhereCondition      //当前条件
 	error   error
 }
 
@@ -40,17 +38,17 @@ func NewOrEmptyConditionBuilder() *ConditionBuilder {
 }
 
 // NewAndConditionBuilder 创建 Builder，当条件个数为1，则加在builder本身，大于1，则加在Items；内部关系是 And
-func NewAndConditionBuilder(conditions ...*WhereCondition) *ConditionBuilder {
+func NewAndConditionBuilder(conditions ...WhereCondition) *ConditionBuilder {
 	return newConditionBuilder(false, conditions...)
 }
 
 // NewOrConditionBuilder 创建 Builder，当条件个数为1，则加在builder本身，大于1，则加在Items；内部关系是 Or
-func NewOrConditionBuilder(conditions ...*WhereCondition) *ConditionBuilder {
+func NewOrConditionBuilder(conditions ...WhereCondition) *ConditionBuilder {
 	return newConditionBuilder(true, conditions...)
 }
 
 // SetCondition builder 设置本级条件
-func (c *ConditionBuilder) SetCondition(condition *WhereCondition) *ConditionBuilder {
+func (c *ConditionBuilder) SetCondition(condition WhereCondition) *ConditionBuilder {
 	c.Current = condition
 	return c
 }
@@ -66,7 +64,7 @@ func (c *ConditionBuilder) AddChildrenBuilder(builders ...*ConditionBuilder) *Co
 }
 
 // AddChildrenCondition builder 添加子条件
-func (c *ConditionBuilder) AddChildrenCondition(conditions ...*WhereCondition) *ConditionBuilder {
+func (c *ConditionBuilder) AddChildrenCondition(conditions ...WhereCondition) *ConditionBuilder {
 	if len(conditions) == 0 {
 		return c.Error("AddChildrenBuilder conditions is empty")
 	}
@@ -79,7 +77,7 @@ func (c *ConditionBuilder) AddChildrenCondition(conditions ...*WhereCondition) *
 }
 
 // BuildSql 生成sql
-func (c *ConditionBuilder) BuildSql() (string, []interface{}, error) {
+func (c *ConditionBuilder) BuildSql(dbType string) (string, []interface{}, error) {
 	if c == nil {
 		return "", nil, errors.New("没有任何条件")
 	}
@@ -90,13 +88,13 @@ func (c *ConditionBuilder) BuildSql() (string, []interface{}, error) {
 			return "", nil, errors.New("没有任何条件")
 		}
 
-		return (*c.Current).GetSql(), (*c.Current).GetParams(), nil
+		return c.Current.Build(dbType)
 	}
 
 	var _sql = make([]string, 0)
 	var _param = make([]interface{}, 0)
 	for _, item := range c.Items {
-		sql, param, err := item.BuildSql()
+		sql, param, err := item.BuildSql(dbType)
 		if err != nil {
 			return "", nil, err
 		}
@@ -118,7 +116,7 @@ func (c *ConditionBuilder) Error(error string) *ConditionBuilder {
 }
 
 // 创建 Builder，当条件个数为1，则加在builder本身，大于1，则加在Items
-func newConditionBuilder(or bool, conditions ...*WhereCondition) *ConditionBuilder {
+func newConditionBuilder(or bool, conditions ...WhereCondition) *ConditionBuilder {
 	var builder = &ConditionBuilder{
 		Or:    or,
 		Items: nil,

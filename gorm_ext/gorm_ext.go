@@ -56,7 +56,7 @@ package gorm_ext
 //			return n
 //		}
 //	} else {
-//		fmt.Println("column must be of type Pointer")
+//		log("column must be of type Pointer")
 //		return ""
 //	}
 //

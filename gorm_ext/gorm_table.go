@@ -3,11 +3,12 @@ package gorm_ext
 import (
 	"errors"
 	"fmt"
+	"reflect"
+	"sync"
+
 	"github.com/ad313/go_ext/ext"
 	"gorm.io/gorm"
 	"gorm.io/gorm/schema"
-	"reflect"
-	"sync"
 )
 
 // 表缓存
@@ -73,7 +74,7 @@ func GetTableColumn(column any) string {
 			return n
 		}
 	} else {
-		fmt.Println("column must be of type Pointer")
+		log("column must be of type Pointer")
 		return ""
 	}
 
@@ -182,25 +183,24 @@ func parseColumnName(field reflect.StructField) string {
 }
 
 // getSqlSm 获取sql 中 数据库字段分隔符
-func getSqlSm() string {
-	//todo
+func getSqlSm(dbType string) string {
+	switch dbType {
+	case MySql:
+		return "'"
+	case Sqlite:
+		return "'"
+	case Dm:
+		return "\""
+	case "postgres":
+		return "'"
+	default:
+		break
+	}
+
 	return ""
-	//switch config.CFG.DB.Db.Type {
-	//case "mysql":
-	//	return "'"
-	////case "clickhouse":
-	////	instance.DB = ch.NewClickHouse(cfg)
-	////	break
-	//case "sqlite":
-	//	return "'"
-	//case "dm":
-	//	return "\""
-	////case "postgres", "pgsql":
-	////	instance.DB = postgres.NewPostgres(cfg)
-	//default:
-	//
-	//	break
-	//}
-	//
-	//return "'"
+}
+
+// 记录日志
+func log(content string) {
+	fmt.Println(content)
 }
