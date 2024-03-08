@@ -104,3 +104,20 @@ func GetPath[T interface{}]() string {
 		return path
 	}
 }
+
+// GetPathByValue 获取类型名称
+func GetPathByValue(table interface{}) string {
+	var value interface{}
+	if IsPointer(table) {
+		value = table
+	} else {
+		value = &table
+	}
+
+	var path = reflect.TypeOf(value).Elem().String()
+	if strings.HasPrefix(path, "*") {
+		return strings.TrimPrefix(path, "*")
+	} else {
+		return path
+	}
+}

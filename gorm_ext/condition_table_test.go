@@ -14,7 +14,7 @@ func Test_Condition_table_error(t *testing.T) {
 		OuterColumn:    nil,
 		CompareSymbols: "",
 	}
-	_, _, err := cond.Build(dbType)
+	_, _, err := cond.BuildSql(dbType)
 	if err == nil {
 		t.Errorf("Test_Condition_table_error faild")
 	}
@@ -27,7 +27,7 @@ func Test_Condition_table_error(t *testing.T) {
 		OuterColumn:    nil,
 		CompareSymbols: "",
 	}
-	_, _, err = cond.Build(dbType)
+	_, _, err = cond.BuildSql(dbType)
 	if err == nil {
 		t.Errorf("Test_Condition_table_error faild")
 	}
@@ -40,7 +40,7 @@ func Test_Condition_table_error(t *testing.T) {
 		OuterColumn:    nil,
 		CompareSymbols: "",
 	}
-	_, _, err = cond.Build(dbType)
+	_, _, err = cond.BuildSql(dbType)
 	if err == nil {
 		t.Errorf("Test_Condition_table_error faild")
 	}
@@ -53,7 +53,7 @@ func Test_Condition_table_error(t *testing.T) {
 		OuterColumn:    &condTable.Name,
 		CompareSymbols: "",
 	}
-	_, _, err = cond.Build(dbType)
+	_, _, err = cond.BuildSql(dbType)
 	if err == nil {
 		t.Errorf("Test_Condition_table_error faild")
 	}
@@ -69,7 +69,7 @@ func Test_Condition_table_Eq(t *testing.T) {
 		OuterColumn:    &condTable.Name,
 		CompareSymbols: Eq,
 	}
-	sql, param, err := cond.clear().Build(dbType)
+	sql, param, err := cond.clear().BuildSql(dbType)
 	if err != nil {
 		t.Errorf("Test_Condition_table_Eq faild")
 	}
@@ -88,7 +88,7 @@ func Test_Condition_table_Eq(t *testing.T) {
 		OuterColumn:    &condTable.Name,
 		CompareSymbols: NotEq,
 	}
-	sql, param, err = cond.clear().Build(dbType)
+	sql, param, err = cond.clear().BuildSql(dbType)
 	if err != nil {
 		t.Errorf("Test_Condition_table_Eq faild")
 	}
@@ -107,7 +107,7 @@ func Test_Condition_table_Eq(t *testing.T) {
 		OuterColumn:    &condTable.Name,
 		CompareSymbols: NotEq,
 	}
-	sql, param, err = cond.clear().Build(dbType)
+	sql, param, err = cond.clear().BuildSql(dbType)
 	if err != nil {
 		t.Errorf("Test_Condition_table_Eq faild")
 	}
@@ -128,7 +128,7 @@ func Test_Condition_table_IsNull(t *testing.T) {
 		OuterColumn:    &condTable.Name,
 		CompareSymbols: IsNull,
 	}
-	sql, param, err := cond.clear().Build(dbType)
+	sql, param, err := cond.clear().BuildSql(dbType)
 	if err != nil {
 		t.Errorf("Test_Condition_table_IsNull faild")
 	}
@@ -147,7 +147,7 @@ func Test_Condition_table_IsNull(t *testing.T) {
 		OuterColumn:    &condTable.Name,
 		CompareSymbols: NotNull,
 	}
-	sql, param, err = cond.clear().Build(dbType)
+	sql, param, err = cond.clear().BuildSql(dbType)
 	if err != nil {
 		t.Errorf("Test_Condition_table_IsNull faild")
 	}

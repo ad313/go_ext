@@ -2,13 +2,15 @@ package gorm_ext
 
 import (
 	"fmt"
+	"gorm.io/gorm"
 	"testing"
 )
 
 type conditionTable struct {
-	Id   string `gorm:"column:id;type:VARCHAR2(36);primaryKey;not null"`
-	Name string `gorm:"column:name;type:VARCHAR2(36);not null"`
-	Age  int    `gorm:"column:age;type:INTEGER(4);not null"`
+	Id        string         `gorm:"column:id;type:VARCHAR2(36);primaryKey;not null"`
+	Name      string         `gorm:"column:name;type:VARCHAR2(36);not null"`
+	Age       int            `gorm:"column:age;type:INTEGER(4);not null"`
+	DeletedAt gorm.DeletedAt `gorm:"column:deleted_at;type:DATETIME(8)" json:"deleted_at"` //删除标识
 }
 
 func (t *conditionTable) TableName() string {
@@ -27,7 +29,7 @@ func Test_Condition_error(t *testing.T) {
 		CompareSymbols: Eq,
 		Arg:            "123",
 	}
-	_, _, err := cond.Build(dbType)
+	_, _, err := cond.BuildSql(dbType)
 	if err == nil {
 		t.Errorf("Test_Condition_error faild")
 	}
@@ -39,7 +41,7 @@ func Test_Condition_error(t *testing.T) {
 		CompareSymbols: "",
 		Arg:            "123",
 	}
-	_, _, err = cond.Build(dbType)
+	_, _, err = cond.BuildSql(dbType)
 	if err == nil {
 		t.Errorf("Test_Condition_error faild")
 	}
@@ -51,7 +53,7 @@ func Test_Condition_error(t *testing.T) {
 		CompareSymbols: Eq,
 		Arg:            nil,
 	}
-	_, _, err = cond.Build(dbType)
+	_, _, err = cond.BuildSql(dbType)
 	if err == nil {
 		t.Errorf("Test_Condition_error faild")
 	}
@@ -63,7 +65,7 @@ func Test_Condition_error(t *testing.T) {
 		CompareSymbols: IsNull,
 		Arg:            nil,
 	}
-	_, _, err = cond.Build(dbType)
+	_, _, err = cond.BuildSql(dbType)
 	if err != nil {
 		t.Errorf("Test_Condition_error faild")
 	}
@@ -75,7 +77,7 @@ func Test_Condition_error(t *testing.T) {
 		CompareSymbols: NotNull,
 		Arg:            nil,
 	}
-	_, _, err = cond.Build(dbType)
+	_, _, err = cond.BuildSql(dbType)
 	if err != nil {
 		t.Errorf("Test_Condition_error faild")
 	}
@@ -89,7 +91,7 @@ func Test_Condition_Eq(t *testing.T) {
 		CompareSymbols: Eq,
 		Arg:            "123",
 	}
-	sql, param, err := cond.clear().Build(dbType)
+	sql, param, err := cond.clear().BuildSql(dbType)
 	if err != nil {
 		t.Errorf("Test_Condition_Eq faild")
 	}
@@ -107,7 +109,7 @@ func Test_Condition_Eq(t *testing.T) {
 		CompareSymbols: NotEq,
 		Arg:            "123",
 	}
-	sql, param, err = cond.clear().Build(dbType)
+	sql, param, err = cond.clear().BuildSql(dbType)
 	if err != nil {
 		t.Errorf("Test_Condition_Eq faild")
 	}
@@ -118,6 +120,24 @@ func Test_Condition_Eq(t *testing.T) {
 		t.Errorf("Test_Condition_Eq faild")
 	}
 
+	//3 func
+	cond = &Condition{
+		TableAlias:     "a",
+		Column:         &condTable.Id,
+		CompareSymbols: NotEq,
+		Arg:            "123",
+		Func:           Count,
+	}
+	sql, param, err = cond.clear().BuildSql(dbType)
+	if err != nil {
+		t.Errorf("Test_Condition_Eq faild")
+	}
+	if sql != fmt.Sprintf("Count(%v.%v) <> ?", f("a"), f("id")) {
+		t.Errorf(fmt.Sprintf("Test_Condition_Eq faild：a：%v", sql))
+	}
+	if len(param) != 1 || param[0] != "123" {
+		t.Errorf("Test_Condition_Eq faild")
+	}
 }
 
 func Test_Condition_Like(t *testing.T) {
@@ -128,7 +148,7 @@ func Test_Condition_Like(t *testing.T) {
 		CompareSymbols: Like,
 		Arg:            "123",
 	}
-	sql, param, err := cond.clear().Build(dbType)
+	sql, param, err := cond.clear().BuildSql(dbType)
 	if err != nil {
 		t.Errorf("Test_Condition_Like faild")
 	}
@@ -146,7 +166,7 @@ func Test_Condition_Like(t *testing.T) {
 		CompareSymbols: NotLike,
 		Arg:            "123",
 	}
-	sql, param, err = cond.clear().Build(dbType)
+	sql, param, err = cond.clear().BuildSql(dbType)
 	if err != nil {
 		t.Errorf("Test_Condition_Like faild")
 	}
@@ -164,7 +184,7 @@ func Test_Condition_Like(t *testing.T) {
 		CompareSymbols: StartWith,
 		Arg:            "123",
 	}
-	sql, param, err = cond.clear().Build(dbType)
+	sql, param, err = cond.clear().BuildSql(dbType)
 	if err != nil {
 		t.Errorf("Test_Condition_Like faild")
 	}
@@ -182,7 +202,7 @@ func Test_Condition_Like(t *testing.T) {
 		CompareSymbols: EndWith,
 		Arg:            "123",
 	}
-	sql, param, err = cond.clear().Build(dbType)
+	sql, param, err = cond.clear().BuildSql(dbType)
 	if err != nil {
 		t.Errorf("Test_Condition_Like faild")
 	}
@@ -202,7 +222,7 @@ func Test_Condition_In(t *testing.T) {
 		CompareSymbols: In,
 		Arg:            []string{"123", "456"},
 	}
-	sql, param, err := cond.clear().Build(dbType)
+	sql, param, err := cond.clear().BuildSql(dbType)
 	if err != nil {
 		t.Errorf("Test_Condition_In faild")
 	}
@@ -220,7 +240,7 @@ func Test_Condition_In(t *testing.T) {
 		CompareSymbols: NotIn,
 		Arg:            []string{"123", "456"},
 	}
-	sql, param, err = cond.clear().Build(dbType)
+	sql, param, err = cond.clear().BuildSql(dbType)
 	if err != nil {
 		t.Errorf("Test_Condition_In faild")
 	}
@@ -240,7 +260,7 @@ func Test_Condition_IsNull(t *testing.T) {
 		CompareSymbols: IsNull,
 		Arg:            []string{"123", "456"},
 	}
-	sql, param, err := cond.clear().Build(dbType)
+	sql, param, err := cond.clear().BuildSql(dbType)
 	if err != nil {
 		t.Errorf("Test_Condition_IsNull faild")
 	}
@@ -258,7 +278,7 @@ func Test_Condition_IsNull(t *testing.T) {
 		CompareSymbols: NotNull,
 		Arg:            []string{"123", "456"},
 	}
-	sql, param, err = cond.clear().Build(dbType)
+	sql, param, err = cond.clear().BuildSql(dbType)
 	if err != nil {
 		t.Errorf("Test_Condition_IsNull faild")
 	}
@@ -278,7 +298,7 @@ func Test_Condition_Gt(t *testing.T) {
 		CompareSymbols: Gt,
 		Arg:            18,
 	}
-	sql, param, err := cond.clear().Build(dbType)
+	sql, param, err := cond.clear().BuildSql(dbType)
 	if err != nil {
 		t.Errorf("Test_Condition_Gt faild")
 	}
@@ -296,7 +316,7 @@ func Test_Condition_Gt(t *testing.T) {
 		CompareSymbols: GtAndEq,
 		Arg:            18,
 	}
-	sql, param, err = cond.clear().Build(dbType)
+	sql, param, err = cond.clear().BuildSql(dbType)
 	if err != nil {
 		t.Errorf("Test_Condition_Gt faild")
 	}
@@ -316,7 +336,7 @@ func Test_Condition_Less(t *testing.T) {
 		CompareSymbols: Less,
 		Arg:            18,
 	}
-	sql, param, err := cond.clear().Build(dbType)
+	sql, param, err := cond.clear().BuildSql(dbType)
 	if err != nil {
 		t.Errorf("Test_Condition_Less faild")
 	}
@@ -334,7 +354,7 @@ func Test_Condition_Less(t *testing.T) {
 		CompareSymbols: LessAndEq,
 		Arg:            18,
 	}
-	sql, param, err = cond.clear().Build(dbType)
+	sql, param, err = cond.clear().BuildSql(dbType)
 	if err != nil {
 		t.Errorf("Test_Condition_Less faild")
 	}

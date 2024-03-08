@@ -1,147 +1,209 @@
 package gorm_ext
 
-//
-//import (
-//	"errors"
-//	"fmt"
-//	"github.com/ad313/go_ext/ext"
-//	"gorm.io/gorm/schema"
-//	"reflect"
-//	"sync"
-//)
-//
-//type BuildOrmModelResult[T interface{}] struct {
-//	T     *T
-//	Error error
-//}
-//
-//// 缓存实体对象，主要给NewQuery方法返回使用
-//var cache sync.Map
-//
-//// columnMap 数据库表字段缓存
-//var columnMap = make(map[uintptr]string)
-//
-//// BuildOrmModel 获取
-//func BuildOrmModel[T interface{}]() *BuildOrmModelResult[T] {
-//	modelTypeStr := reflect.TypeOf((*T)(nil)).Elem().String()
-//	if model, ok := cache.Load(modelTypeStr); ok {
-//		m, isReal := model.(*T)
-//		if isReal {
-//			return &BuildOrmModelResult[T]{T: m}
-//		}
-//	}
-//
-//	t, _, ok := ext.IsType[T, schema.Tabler]()
-//	if ok == false {
-//		return &BuildOrmModelResult[T]{Error: errors.New("传入类型必须是实现了 TableName 的表实体")}
-//	}
-//
-//	cache.Store(modelTypeStr, t)
-//	var cm = getColumnNameMap(t)
-//	for key, v := range cm {
-//		columnMap[key] = v
-//	}
-//
-//	return &BuildOrmModelResult[T]{T: t}
-//}
-//
-//// GetTableColumn 通过模型字段获取数据库字段
-//func GetTableColumn(column any) string {
-//	var v = reflect.ValueOf(column)
-//	var addr uintptr
-//	if v.Kind() == reflect.Pointer {
-//		addr = v.Pointer()
-//		n, ok := columnMap[addr]
-//		if ok {
-//			return n
-//		}
-//	} else {
-//		log("column must be of type Pointer")
-//		return ""
-//	}
-//
-//	return ""
-//}
-//
-//func getColumnNameMap(model any) map[uintptr]string {
-//	var columnNameMap = make(map[uintptr]string)
-//	valueOf := reflect.ValueOf(model).Elem()
-//	typeOf := reflect.TypeOf(model).Elem()
-//	for i := 0; i < valueOf.NumField(); i++ {
-//		field := typeOf.Field(i)
-//		// 如果当前实体嵌入了其他实体，同样需要缓存它的字段名
-//		if field.Anonymous {
-//			// 如果存在多重嵌套，通过递归方式获取他们的字段名
-//			subFieldMap := getSubFieldColumnNameMap(valueOf, field)
-//			for pointer, columnName := range subFieldMap {
-//				columnNameMap[pointer] = columnName
-//			}
-//		} else {
-//			// 获取对象字段指针值
-//			pointer := valueOf.Field(i).Addr().Pointer()
-//			columnName := parseColumnName(field)
-//			if columnName != "" {
-//				columnNameMap[pointer] = columnName
-//			}
-//		}
-//	}
-//	return columnNameMap
-//}
-//
-//// 递归获取嵌套字段名
-//func getSubFieldColumnNameMap(valueOf reflect.Value, field reflect.StructField) map[uintptr]string {
-//	result := make(map[uintptr]string)
-//	modelType := field.Type
-//	if modelType.Kind() == reflect.Ptr {
-//		modelType = modelType.Elem()
-//	}
-//	for j := 0; j < modelType.NumField(); j++ {
-//		subField := modelType.Field(j)
-//		if subField.Anonymous {
-//			nestedFields := getSubFieldColumnNameMap(valueOf, subField)
-//			for key, value := range nestedFields {
-//				result[key] = value
-//			}
-//		} else {
-//			pointer := valueOf.FieldByName(modelType.Field(j).Name).Addr().Pointer()
-//			name := parseColumnName(modelType.Field(j))
-//			result[pointer] = name
-//		}
-//	}
-//
-//	return result
-//}
-//
-//// 解析字段名称
-//func parseColumnName(field reflect.StructField) string {
-//	tagSetting := schema.ParseTagSetting(field.Tag.Get("gorm"), ";")
-//	name, ok := tagSetting["COLUMN"]
-//	if ok {
-//		return name
-//	}
-//	return ""
-//}
-//
-//// getSqlSm 获取sql 中 数据库字段分隔符
-//func getSqlSm() string {
-//	//todo
-//	return ""
-//	//switch config.CFG.DB.Db.Type {
-//	//case "mysql":
-//	//	return "'"
-//	////case "clickhouse":
-//	////	instance.DB = ch.NewClickHouse(cfg)
-//	////	break
-//	//case "sqlite":
-//	//	return "'"
-//	//case "dm":
-//	//	return "\""
-//	////case "postgres", "pgsql":
-//	////	instance.DB = postgres.NewPostgres(cfg)
-//	//default:
-//	//
-//	//	break
-//	//}
-//	//
-//	//return "'"
-//}
+import (
+	"errors"
+	"fmt"
+	"github.com/ad313/go_ext/ext"
+	"gorm.io/gorm/schema"
+	"reflect"
+)
+
+// ResolveTableColumnName 从缓存获取数据库字段名称：如果不能匹配，则返回 string 值
+func ResolveTableColumnName(column any, dbType string) string {
+	var kind = reflect.ValueOf(column).Kind()
+	if kind == reflect.Pointer {
+		var name = GetTableColumn(column)
+		if name == "" {
+			return ""
+		}
+		return getSqlSm(dbType) + name + getSqlSm(dbType)
+	} else {
+		if str, ok := column.(string); ok && str != "" {
+			return getSqlSm(dbType) + str + getSqlSm(dbType)
+		} else {
+			return ""
+		}
+	}
+}
+
+// mergeWhereString 组合 where 条件
+func mergeWhereString(column any, compareSymbols string, tableAlias string, f string, dbType string) (string, error) {
+	name, err := resolveColumnName(column, dbType)
+	if err != nil {
+		return "", err
+	}
+
+	var valueExpress = "?"
+	switch compareSymbols {
+	case "IN":
+		valueExpress = "(?)"
+		break
+	case "NOT IN":
+		valueExpress = "(?)"
+		break
+	case "IS NULL":
+		valueExpress = ""
+		break
+	case "IS NOT NULL":
+		valueExpress = ""
+		break
+	}
+
+	var table = ""
+	if tableAlias != "" {
+		table = formatSqlName(tableAlias, dbType) + "."
+	}
+
+	name = table + name
+	return fmt.Sprintf("%v %v %v", mergeNameAndFunc(name, f), getCompareSymbols(compareSymbols), valueExpress), nil
+}
+
+// mergeWhereValue 处理查询值，当 IN 条件时，拼接 %
+func mergeWhereValue(compareSymbols string, value interface{}) interface{} {
+	if value == nil {
+		return value
+	}
+	v, ok := value.(string)
+	if !ok {
+		return value
+	}
+
+	switch compareSymbols {
+	case "LIKE":
+		return "%" + v + "%"
+	case "NOT LIKE":
+		return "%" + v + "%"
+	case "STARTWITH":
+		return v + "%"
+	case "ENDWITH":
+		return "%" + v
+	}
+
+	return value
+}
+
+// 检查各种条件下参数是否为空
+func checkParam(compareSymbols string, value interface{}) (interface{}, error) {
+	if compareSymbols == "" {
+		return nil, errors.New("compareSymbols 不能为空")
+	}
+
+	var check = true
+	switch compareSymbols {
+	case "LIKE":
+		break
+	case "NOT LIKE":
+		break
+	case "STARTWITH":
+		break
+	case "ENDWITH":
+		break
+	case "IN":
+		break
+	case "NOT IN":
+		break
+	case "IS NULL":
+		check = false
+		break
+	case "IS NOT NULL":
+		check = false
+		break
+	}
+
+	//不需要参数
+	if !check {
+		value = nil
+	}
+
+	if check && value == nil {
+		return nil, errors.New("参数不能为空")
+	}
+
+	return value, nil
+}
+
+func getCompareSymbols(compareSymbols string) string {
+	switch compareSymbols {
+	case "LIKE":
+		return compareSymbols
+	case "NOT LIKE":
+		return compareSymbols
+	case "STARTWITH":
+		return "LIKE"
+	case "ENDWITH":
+		return "LIKE"
+	}
+
+	return compareSymbols
+}
+
+// resolveColumnName 从缓存获取数据库字段名称：如果不能匹配，则返回 string 值
+func resolveColumnName(column any, dbType string) (string, error) {
+	var name = ResolveTableColumnName(column, dbType)
+	if name == "" {
+		return "", errors.New("未获取到字段名称")
+	}
+	return name, nil
+}
+
+// 处理数据库表名
+func formatSqlName(alias string, dbType string) string {
+	if alias == "" {
+		return alias
+	}
+
+	return getSqlSm(dbType) + alias + getSqlSm(dbType)
+}
+
+// 处理数据库表名 加上别名
+func mergeTableWithAlias(table string, alias string, dbType string) string {
+	if table == "" {
+		return table
+	}
+
+	table = getSqlSm(dbType) + table + getSqlSm(dbType)
+
+	if alias != "" {
+		table += " as " + alias
+	}
+
+	return table
+}
+
+// 处理数据库表名 加上别名
+func mergeTableWithAliasByValue(table schema.Tabler, alias string, dbType string) string {
+	return mergeTableWithAlias(table.TableName(), alias, dbType)
+}
+
+// 获取软删除字段
+func getTableSoftDeleteColumnSql(table schema.Tabler, tableAlias string, dbType string) (string, error) {
+	var tableSchema = GetTableSchema(table)
+	if tableSchema != nil && tableSchema.DeletedColumnName != "" {
+		n, err := resolveColumnName(tableSchema.DeletedColumnName, dbType)
+		if err != nil {
+			return "", err
+		}
+
+		if tableAlias != "" {
+			n = formatSqlName(tableAlias, _dbType) + "." + n
+		}
+
+		return n + " IS NULL", nil
+	}
+
+	return "", nil
+}
+
+func mergeTableColumnWithFunc(column interface{}, table string, f string, dbType string) (string, error) {
+	name, err := resolveColumnName(column, dbType)
+	if err != nil {
+		return "", err
+	}
+
+	return ext.ChooseTrueValue(table != "", mergeNameAndFunc(formatSqlName(table, dbType)+"."+name, f), mergeNameAndFunc(name, f)), nil
+}
+
+// 合并字段和数据库函数
+func mergeNameAndFunc(name, f string) string {
+	return ext.ChooseTrueValue(f == "", name, f+"("+name+")")
+}

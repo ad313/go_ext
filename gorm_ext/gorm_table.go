@@ -13,13 +13,18 @@ import (
 
 // 表缓存
 var tableCache sync.Map
+var tableSchemaCache sync.Map
 
 // 字段缓存
 var columnCache = make(map[uintptr]string)
 
 // TableInfo 表信息
 type TableInfo[T interface{}] struct {
-	T                 *T
+	T *T
+	*TableSchema
+}
+
+type TableSchema struct {
 	Name              string //表名
 	DeletedColumnName string //软删除字段名
 }
@@ -54,11 +59,14 @@ func BuildGormTable[T interface{}]() *GormTableResult[T] {
 
 	//缓存
 	var cache = &TableInfo[T]{
-		T:                 t,
-		Name:              (*table).TableName(),
-		DeletedColumnName: softDeletedName,
+		T: t,
+		TableSchema: &TableSchema{
+			Name:              (*table).TableName(),
+			DeletedColumnName: softDeletedName,
+		},
 	}
 	tableCache.Store(modelType, cache)
+	tableSchemaCache.Store(modelType, cache.TableSchema)
 
 	return &GormTableResult[T]{Table: cache}
 }
@@ -79,6 +87,19 @@ func GetTableColumn(column any) string {
 	}
 
 	return ""
+}
+
+// GetTableSchema 获取表元数据
+func GetTableSchema(table schema.Tabler) *TableSchema {
+	modelType := ext.GetPathByValue(table)
+	if model, ok := tableSchemaCache.Load(modelType); ok {
+		m, isReal := model.(*TableSchema)
+		if isReal {
+			return m
+		}
+	}
+
+	return nil
 }
 
 func getColumnNameMap(model any) (map[uintptr]string, string) {
@@ -186,12 +207,14 @@ func parseColumnName(field reflect.StructField) string {
 func getSqlSm(dbType string) string {
 	switch dbType {
 	case MySql:
-		return "'"
+		return "`"
 	case Sqlite:
 		return "'"
 	case Dm:
 		return "\""
-	case "postgres":
+	case Postgres:
+		return "'"
+	case Sqlserver:
 		return "'"
 	default:
 		break

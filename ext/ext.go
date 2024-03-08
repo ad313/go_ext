@@ -483,6 +483,14 @@ func OrderByString[T interface{}](slice []T, asc bool, order func(t T) string) [
 	return slice
 }
 
+func FirstOrDefault[T interface{}](slice []T) T {
+	if len(slice) > 0 {
+		return slice[0]
+	}
+
+	return *new(T)
+}
+
 //
 //func isPointer(v interface{}) bool {
 //	rv := reflect.ValueOf(v)

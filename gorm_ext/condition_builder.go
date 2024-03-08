@@ -8,7 +8,7 @@ import (
 
 // WhereCondition 定义查询条件
 type WhereCondition interface {
-	Build(dbType string) (string, []interface{}, error) //生成 sql
+	BuildSql(dbType string, ext ...interface{}) (string, []interface{}, error) //生成 sql
 }
 
 // ConditionBuilder 条件构建器
@@ -77,7 +77,7 @@ func (c *ConditionBuilder) AddChildrenCondition(conditions ...WhereCondition) *C
 }
 
 // BuildSql 生成sql
-func (c *ConditionBuilder) BuildSql(dbType string) (string, []interface{}, error) {
+func (c *ConditionBuilder) BuildSql(dbType string, extend ...interface{}) (string, []interface{}, error) {
 	if c == nil {
 		return "", nil, errors.New("没有任何条件")
 	}
@@ -88,13 +88,13 @@ func (c *ConditionBuilder) BuildSql(dbType string) (string, []interface{}, error
 			return "", nil, errors.New("没有任何条件")
 		}
 
-		return c.Current.Build(dbType)
+		return c.Current.BuildSql(dbType)
 	}
 
 	var _sql = make([]string, 0)
 	var _param = make([]interface{}, 0)
 	for _, item := range c.Items {
-		sql, param, err := item.BuildSql(dbType)
+		sql, param, err := item.BuildSql(dbType, extend)
 		if err != nil {
 			return "", nil, err
 		}

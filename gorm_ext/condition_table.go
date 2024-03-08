@@ -2,7 +2,6 @@ package gorm_ext
 
 import (
 	"errors"
-	"github.com/ad313/go_ext/ext"
 )
 
 // TableCondition 表与表之间比较条件
@@ -12,6 +11,8 @@ type TableCondition struct {
 	OuterAlias     string //外部表表别名(exists)；右边表别名
 	OuterColumn    any    //外部表字段名(exists)；右边表字段名
 	CompareSymbols string //比较运算符号
+	InnerFunc      string //数据库函数，max、min 等，给当前字段套上函数 左表
+	OuterFunc      string //数据库函数，max、min 等，给当前字段套上函数 右表
 
 	isBuild bool   //是否已经build
 	sql     string //生成的sql
@@ -19,7 +20,7 @@ type TableCondition struct {
 	error error //错误
 }
 
-func (c *TableCondition) Build(dbType string) (string, []interface{}, error) {
+func (c *TableCondition) BuildSql(dbType string, extend ...interface{}) (string, []interface{}, error) {
 	if !c.isBuild {
 		if dbType == "" {
 			c.error = errors.New("请指定数据库类型")
@@ -32,7 +33,7 @@ func (c *TableCondition) Build(dbType string) (string, []interface{}, error) {
 		}
 
 		//左边sql
-		innerSql, err := mergeTableColumn(c.InnerColumn, c.InnerAlias, dbType)
+		innerSql, err := mergeTableColumnWithFunc(c.InnerColumn, c.InnerAlias, c.InnerFunc, dbType)
 		c.error = err
 		if c.error != nil {
 			return "", nil, c.error
@@ -47,7 +48,7 @@ func (c *TableCondition) Build(dbType string) (string, []interface{}, error) {
 
 		if flag == "1" {
 			//右边sql
-			outerSql, err := mergeTableColumn(c.OuterColumn, c.OuterAlias, dbType)
+			outerSql, err := mergeTableColumnWithFunc(c.OuterColumn, c.OuterAlias, c.OuterFunc, dbType)
 			c.error = err
 			if c.error != nil {
 				return "", nil, c.error
@@ -72,13 +73,4 @@ func (c *TableCondition) clear() *TableCondition {
 	}
 
 	return c
-}
-
-func mergeTableColumn(column interface{}, table string, dbType string) (string, error) {
-	name, err := resolveColumnName(column, dbType)
-	if err != nil {
-		return "", err
-	}
-
-	return ext.ChooseTrueValue(table != "", formatTableAlias(table, dbType)+"."+name, name), nil
 }
