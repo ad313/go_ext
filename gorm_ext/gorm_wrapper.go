@@ -457,6 +457,22 @@ func (a *OrmWrapper[T]) ToList(scan ...func(db *gorm.DB) error) ([]*T, error) {
 // ToPagerList 分页查询，返回当前实体的分页结果
 func (a *OrmWrapper[T]) ToPagerList(pager *Pager) (*PagerList[T], error) {
 
+	var data = make([]*T, 0)
+	result, err := a.ToPagerListCustom(pager, func(db *gorm.DB) error {
+		return db.Scan(&data).Error
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	result.Data = data
+	return result, nil
+}
+
+// ToPagerListCustom 分页查询，返回自定义实体的分页结果
+func (a *OrmWrapper[T]) ToPagerListCustom(pager *Pager, scan func(db *gorm.DB) error) (*PagerList[T], error) {
+
 	//Build sql
 	a.BuildForQuery()
 
@@ -499,58 +515,6 @@ func (a *OrmWrapper[T]) ToPagerList(pager *Pager) (*PagerList[T], error) {
 	} else {
 		err = a.builder.DbContext.Count(&total).Error
 	}
-	if err != nil {
-		return nil, err
-	}
-
-	var result = &PagerList[T]{
-		Page:       pager.Page,
-		PageSize:   pager.PageSize,
-		TotalCount: int32(total),
-		Order:      pager.Order,
-	}
-
-	var data = make([]*T, 0)
-	result.Data = &data
-
-	if result.TotalCount > 0 {
-		err = a.builder.DbContext.Offset(int((pager.Page - 1) * pager.PageSize)).Limit(int(pager.PageSize)).Scan(&result.Data).Error
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return result, nil
-}
-
-// ToPagerListCustom 分页查询，返回自定义实体的分页结果
-func (a *OrmWrapper[T]) ToPagerListCustom(pager *Pager, scan func(db *gorm.DB) error) (*PagerList[T], error) {
-
-	//创建语句过程中的错误
-	if a.Error != nil {
-		return nil, a.Error
-	}
-
-	if pager == nil {
-		return nil, errors.New("传入分页数据不能为空")
-	}
-
-	a.OrderBy(pager.Order)
-
-	//Build sql
-	a.BuildForQuery()
-
-	if pager.Page <= 0 {
-		pager.Page = 1
-	}
-
-	if pager.PageSize <= 0 {
-		pager.PageSize = 20
-	}
-
-	//总条数
-	var total int64
-	err := a.builder.DbContext.Count(&total).Error
 	if err != nil {
 		return nil, err
 	}

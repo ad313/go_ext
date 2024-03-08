@@ -16,7 +16,7 @@ type PagerList[T interface{}] struct {
 	PageSize   int32  `json:"page_size" form:"page_size"`     //分页条数
 	TotalCount int32  `json:"total_count" form:"total_count"` //总条数
 	Order      string `json:"order" form:"order"`             //排序字段
-	Data       *[]*T  `json:"data" form:"data"`               //数据项
+	Data       []*T   `json:"data" form:"data"`               //数据项
 }
 
 // Pager 分页数据请求模型
