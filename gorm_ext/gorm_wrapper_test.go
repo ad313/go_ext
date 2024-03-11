@@ -76,6 +76,8 @@ func NewDb(conn string) *gorm.DB {
 	if len(conn) == 0 {
 		panic("数据库连接字符未配置")
 	}
+	var gext = 1
+	fmt.Println(gext)
 
 	db, err := gorm.Open(mysql.Open(conn), &gorm.Config{})
 	if err != nil {
