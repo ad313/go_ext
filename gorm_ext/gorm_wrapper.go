@@ -375,15 +375,6 @@ func (a *OrmWrapper[T]) ToSql() (string, error) {
 	}), nil
 }
 
-type Table111 struct {
-}
-
-func toSql(db *gorm.DB) string {
-	return db.ToSQL(func(tx *gorm.DB) *gorm.DB {
-		return tx.Find(&[]*Table111{})
-	})
-}
-
 // Count 查询总条数
 func (a *OrmWrapper[T]) Count() (int64, error) {
 
@@ -395,18 +386,24 @@ func (a *OrmWrapper[T]) Count() (int64, error) {
 		return 0, a.Error
 	}
 
-	var result int64
-	//First 会自动添加主键排序
-	err := a.builder.DbContext.Count(&result).Error
+	var err error
+	var total int64
+
+	//left join 加上 distinct
+	if len(a.builder.leftJoin) > 0 {
+		err = _db.Table("(?) as leftJoinTableWrapper", a.builder.DbContext).Count(&total).Error
+	} else {
+		err = a.builder.DbContext.Count(&total).Error
+	}
 	if err != nil {
 		return 0, err
 	}
 
-	return result, nil
+	return total, nil
 }
 
-// FirstOrDefault 返回第一条，没命中返回nil
-func (a *OrmWrapper[T]) FirstOrDefault() (*T, error) {
+// FirstOrDefault 返回第一条，没命中返回nil，可以传入自定义scan，自定义接收数据
+func (a *OrmWrapper[T]) FirstOrDefault(scan ...func(db *gorm.DB) error) (*T, error) {
 
 	//Build sql
 	a.BuildForQuery()
@@ -416,9 +413,18 @@ func (a *OrmWrapper[T]) FirstOrDefault() (*T, error) {
 		return nil, a.Error
 	}
 
+	var err error
 	var result = new(T)
-	//First 会自动添加主键排序
-	err := a.builder.DbContext.Take(result).Error
+	if len(scan) > 0 {
+		if scan[0] == nil {
+			return nil, errors.New("scan 函数不能为空")
+		}
+		err = scan[0](a.builder.DbContext)
+	} else {
+		//First 会自动添加主键排序
+		err = a.builder.DbContext.Take(result).Error
+	}
+
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
@@ -442,6 +448,9 @@ func (a *OrmWrapper[T]) ToList(scan ...func(db *gorm.DB) error) ([]*T, error) {
 	a.BuildForQuery()
 
 	if len(scan) > 0 {
+		if scan[0] == nil {
+			return nil, errors.New("scan 函数不能为空")
+		}
 		return nil, scan[0](a.builder.DbContext)
 	}
 
@@ -454,24 +463,8 @@ func (a *OrmWrapper[T]) ToList(scan ...func(db *gorm.DB) error) ([]*T, error) {
 	return list, nil
 }
 
-// ToPagerList 分页查询，返回当前实体的分页结果
-func (a *OrmWrapper[T]) ToPagerList(pager *Pager) (*PagerList[T], error) {
-
-	var data = make([]*T, 0)
-	result, err := a.ToPagerListCustom(pager, func(db *gorm.DB) error {
-		return db.Scan(&data).Error
-	})
-
-	if err != nil {
-		return nil, err
-	}
-
-	result.Data = data
-	return result, nil
-}
-
-// ToPagerListCustom 分页查询，返回自定义实体的分页结果
-func (a *OrmWrapper[T]) ToPagerListCustom(pager *Pager, scan func(db *gorm.DB) error) (*PagerList[T], error) {
+// ToPagerList 分页查询，可以自定义scan，否则返回当前实体分页结果
+func (a *OrmWrapper[T]) ToPagerList(pager *Pager, scan ...func(db *gorm.DB) error) (*PagerList[T], error) {
 
 	//Build sql
 	a.BuildForQuery()
@@ -526,18 +519,107 @@ func (a *OrmWrapper[T]) ToPagerListCustom(pager *Pager, scan func(db *gorm.DB) e
 		Order:      pager.Order,
 	}
 
-	if scan == nil {
-		return nil, errors.New("scan 函数不能为空")
+	if result.TotalCount == 0 {
+		return result, nil
 	}
 
-	if result.TotalCount > 0 {
-		err = scan(a.builder.DbContext.Offset(int((pager.Page - 1) * pager.PageSize)).Limit(int(pager.PageSize)))
-		if err != nil {
-			return nil, err
+	if len(scan) == 0 {
+		err = a.builder.DbContext.Offset(int((pager.Page - 1) * pager.PageSize)).Limit(int(pager.PageSize)).Scan(&result.Data).Error
+	} else {
+		if scan[0] == nil {
+			return nil, errors.New("scan 函数不能为空")
 		}
+
+		err = scan[0](a.builder.DbContext.Offset(int((pager.Page - 1) * pager.PageSize)).Limit(int(pager.PageSize)))
+	}
+
+	if err != nil {
+		return nil, err
 	}
 
 	return result, nil
+}
+
+// Update 更新，传了字段只更新出入字段，否则更新全部
+func (a *OrmWrapper[T]) Update(item *T, updateColumns ...interface{}) (int64, error) {
+	if item == nil {
+		return 0, nil
+	}
+
+	var isUpdateAll = false
+	if len(updateColumns) > 0 {
+		a.Select(updateColumns...)
+	} else {
+		isUpdateAll = true
+	}
+
+	a.BuildForQuery()
+
+	//创建语句过程中的错误
+	if a.Error != nil {
+		return 0, a.Error
+	}
+
+	var result *gorm.DB
+	if isUpdateAll {
+		result = a.builder.DbContext.Save(item)
+		return result.RowsAffected, result.Error
+	} else {
+		result = a.builder.DbContext.UpdateColumns(item)
+		return result.RowsAffected, result.Error
+	}
+}
+
+// UpdateList 更新，传了字段只更新出入字段，否则更新全部
+func (a *OrmWrapper[T]) UpdateList(items []*T, updateColumns ...interface{}) (int64, error) {
+	if len(items) == 0 {
+		return 0, nil
+	}
+
+	var total int64 = 0
+
+	//外部开启了事务
+	if a.builder.isOuterDb {
+		for _, item := range items {
+			c, err := a.Update(item, updateColumns...)
+			if err != nil {
+				return 0, err
+			}
+
+			total += c
+		}
+
+		return total, nil
+	}
+
+	//本地开事务
+	var db = a.builder.DbContext
+
+	err := db.Transaction(func(tx *gorm.DB) error {
+		for i, item := range items {
+			//重新设置db
+			if i == 0 {
+				a.SetDb(a.builder.ctx, tx)
+			}
+
+			c, err := a.Update(item, updateColumns...)
+			if err != nil {
+				return err
+			}
+
+			total += c
+		}
+
+		a.SetDb(a.builder.ctx, db)
+
+		return nil
+	})
+
+	if err != nil {
+		return 0, err
+	}
+
+	return total, nil
 }
 
 // Build 创建 gorm sql
